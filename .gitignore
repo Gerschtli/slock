@@ -1,2 +1,4 @@
 *.o
+config.h
 slock
+slock-config.diff
