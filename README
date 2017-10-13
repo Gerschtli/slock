@@ -3,6 +3,11 @@ slock - simple screen locker
 simple screen locker utility for X.
 
 
+Customizations
+--------------
+Applied slock-dpms patch written by geistesk (https://github.com/geistesk/slock-dpms).
+
+
 Requirements
 ------------
 In order to build slock you need the Xlib header files.
