@@ -1,0 +1,163 @@
+diff --git c/README w/README
+index a81290d..b37c88b 100644
+--- c/README
++++ w/README
+@@ -3,6 +3,11 @@ slock - simple screen locker
+ simple screen locker utility for X.
+ 
+ 
++Customizations
++--------------
++Applied slock-dpms patch written by geistesk (https://github.com/geistesk/slock-dpms).
++
++
+ Requirements
+ ------------
+ In order to build slock you need the Xlib header files.
+diff --git c/README.local w/README.local
+new file mode 100644
+index 0000000..e4bfedb
+--- /dev/null
++++ w/README.local
+@@ -0,0 +1,11 @@
++# Build from source
++
++```sh
++$ sudo make config.h clean install
++```
++
++# Build patch
++
++```sh
++$ ./create-patch.sh 1.4
++```
+diff --git c/config.def.h w/config.def.h
+index 9855e21..e8c8b98 100644
+--- c/config.def.h
++++ w/config.def.h
+@@ -3,10 +3,13 @@ static const char *user  = "nobody";
+ static const char *group = "nogroup";
+ 
+ static const char *colorname[NUMCOLS] = {
+-	[INIT] =   "black",     /* after initialization */
+-	[INPUT] =  "#005577",   /* during input */
+-	[FAILED] = "#CC3333",   /* wrong password */
++	[INIT] =   "#3077a0",   /* after initialization */
++	[INPUT] =  "#2c7f1f",   /* during input */
++	[FAILED] = "#330606",   /* wrong password */
+ };
+ 
+ /* treat a cleared input like a wrong password (color) */
+-static const int failonclear = 1;
++static const int failonclear = 0;
++
++/* time in seconds before the monitor shuts down */
++static const int monitortime = 3;
+diff --git c/slock.c w/slock.c
+index d2f0886..afdc4fc 100644
+--- c/slock.c
++++ w/slock.c
+@@ -15,6 +15,7 @@
+ #include <unistd.h>
+ #include <sys/types.h>
+ #include <X11/extensions/Xrandr.h>
++#include <X11/extensions/dpms.h>
+ #include <X11/keysym.h>
+ #include <X11/Xlib.h>
+ #include <X11/Xutil.h>
+@@ -177,7 +178,7 @@ readpw(Display *dpy, struct xrandr *rr, struct lock **locks, int nscreens,
+ 				break;
+ 			case XK_BackSpace:
+ 				if (len)
+-					passwd[len--] = '\0';
++					passwd[--len] = '\0';
+ 				break;
+ 			default:
+ 				if (num && !iscntrl((int)buf[0]) &&
+@@ -201,13 +202,21 @@ readpw(Display *dpy, struct xrandr *rr, struct lock **locks, int nscreens,
+ 			rre = (XRRScreenChangeNotifyEvent*)&ev;
+ 			for (screen = 0; screen < nscreens; screen++) {
+ 				if (locks[screen]->win == rre->window) {
+-					XResizeWindow(dpy, locks[screen]->win,
+-					              rre->width, rre->height);
++					if (rre->rotation == RR_Rotate_90 ||
++					    rre->rotation == RR_Rotate_270)
++						XResizeWindow(dpy, locks[screen]->win,
++						              rre->height, rre->width);
++					else
++						XResizeWindow(dpy, locks[screen]->win,
++						              rre->width, rre->height);
+ 					XClearWindow(dpy, locks[screen]->win);
++					break;
+ 				}
+ 			}
+-		} else for (screen = 0; screen < nscreens; screen++)
+-			XRaiseWindow(dpy, locks[screen]->win);
++		} else {
++			for (screen = 0; screen < nscreens; screen++)
++				XRaiseWindow(dpy, locks[screen]->win);
++		}
+ 	}
+ }
+ 
+@@ -289,6 +298,14 @@ lockscreen(Display *dpy, struct xrandr *rr, int screen)
+ 	return NULL;
+ }
+ 
++static void
++monitorreset(Display* dpy, CARD16 standby, CARD16 suspend, CARD16 off)
++{
++	DPMSSetTimeouts(dpy, standby, suspend, off);
++	DPMSForceLevel(dpy, DPMSModeOn);
++	XFlush(dpy);
++}
++
+ static void
+ usage(void)
+ {
+@@ -306,6 +323,7 @@ main(int argc, char **argv) {
+ 	const char *hash;
+ 	Display *dpy;
+ 	int s, nlocks, nscreens;
++	CARD16 standby, suspend, off;
+ 
+ 	ARGBEGIN {
+ 	case 'v':
+@@ -366,12 +384,28 @@ main(int argc, char **argv) {
+ 	if (nlocks != nscreens)
+ 		return 1;
+ 
++	/* DPMS-magic to disable the monitor */
++	if (!DPMSCapable(dpy))
++		die("slock: DPMSCapable failed\n");
++	if (!DPMSEnable(dpy))
++		die("slock: DPMSEnable failed\n");
++	if (!DPMSGetTimeouts(dpy, &standby, &suspend, &off))
++		die("slock: DPMSGetTimeouts failed\n");
++	if (!standby || !suspend || !off)
++		/* set values if there arent some */
++		standby = suspend = off = 300;
++
++	DPMSSetTimeouts(dpy, monitortime, monitortime, monitortime);
++	XFlush(dpy);
++
+ 	/* run post-lock command */
+ 	if (argc > 0) {
+ 		switch (fork()) {
+ 		case -1:
+ 			die("slock: fork failed: %s\n", strerror(errno));
+ 		case 0:
++			monitorreset(dpy, standby, suspend, off);
++
+ 			if (close(ConnectionNumber(dpy)) < 0)
+ 				die("slock: close: %s\n", strerror(errno));
+ 			execvp(argv[0], argv);
+@@ -383,5 +417,8 @@ main(int argc, char **argv) {
+ 	/* everything is now blank. Wait for the correct password */
+ 	readpw(dpy, &rr, locks, nscreens, hash);
+ 
++	/* reset DPMS values to inital ones */
++	monitorreset(dpy, standby, suspend, off);
++
+ 	return 0;
+ }
