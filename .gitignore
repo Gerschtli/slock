@@ -1,4 +1,4 @@
 *.o
 config.h
 slock
-slock-config.diff
+travis-test.diff
