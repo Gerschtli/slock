@@ -1,0 +1,23 @@
+name: Build
+on:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      version: 1.4
+      filename: actions-test.diff
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Fetch tags
+        run: git fetch --depth=1 origin +refs/tags/*:refs/tags/*
+
+      - name: Create patch
+        run: ./create-patch.sh ${{env.version}} ${{env.filename}}
+
+      - name: Check patch
+        run: cmp --silent ${{env.filename}} patch-${{env.version}}.diff
