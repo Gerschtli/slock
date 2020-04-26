@@ -7,7 +7,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       version: 1.4
-      filename: actions-test.diff
 
     steps:
       - name: Checkout repository
@@ -17,7 +16,19 @@ jobs:
         run: git fetch --depth=1 origin +refs/tags/*:refs/tags/*
 
       - name: Create patch
-        run: ./create-patch.sh ${{env.version}} ${{env.filename}}
+        run: ./create-patch.sh ${{env.version}}
 
       - name: Check patch
-        run: cmp --silent ${{env.filename}} patch-${{env.version}}.diff
+        run: git diff --exit-code
+        id: check-patch
+        continue-on-error: true
+
+      - name: Commit and push changes
+        uses: github-actions-x/commit@v2.5
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: Update patch
+          name: Update Bot
+          email: update@bot
+          rebase: true
+        if: steps.check-patch.outcome == 'failure'
