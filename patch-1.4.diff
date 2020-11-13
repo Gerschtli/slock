@@ -70,6 +70,17 @@ index 9855e21..e8c8b98 100644
 +
 +/* time in seconds before the monitor shuts down */
 +static const int monitortime = 3;
+diff --git c/renovate.json w/renovate.json
+new file mode 100644
+index 0000000..f45d8f1
+--- /dev/null
++++ w/renovate.json
+@@ -0,0 +1,5 @@
++{
++  "extends": [
++    "config:base"
++  ]
++}
 diff --git c/slock.c w/slock.c
 index d2f0886..afdc4fc 100644
 --- c/slock.c
