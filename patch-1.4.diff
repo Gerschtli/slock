@@ -15,6 +15,100 @@ index 0000000..3bb3187
 +[*.yml]
 +indent_style = space
 +indent_size = 2
+diff --git c/LICENSE w/LICENSE
+index 2e4419b..cb52dba 100644
+--- c/LICENSE
++++ w/LICENSE
+@@ -4,6 +4,7 @@ MIT/X Consortium License
+ © 2014 Dimitris Papastamos <sin@2f30.org>
+ © 2006-2014 Anselm R Garbe <anselm@garbe.us>
+ © 2014-2016 Laslo Hunhold <dev@frign.de>
++© 2016-2023 Hiltjo Posthuma <hiltjo@codemadness.org>
+ 
+ Permission is hereby granted, free of charge, to any person obtaining a
+ copy of this software and associated documentation files (the "Software"),
+diff --git c/Makefile w/Makefile
+index f4ffbb7..6d74b21 100644
+--- c/Makefile
++++ w/Makefile
+@@ -6,56 +6,41 @@ include config.mk
+ SRC = slock.c ${COMPATSRC}
+ OBJ = ${SRC:.c=.o}
+ 
+-all: options slock
+-
+-options:
+-	@echo slock build options:
+-	@echo "CFLAGS   = ${CFLAGS}"
+-	@echo "LDFLAGS  = ${LDFLAGS}"
+-	@echo "CC       = ${CC}"
++all: slock
+ 
+ .c.o:
+-	@echo CC $<
+-	@${CC} -c ${CFLAGS} $<
++	${CC} -c ${CFLAGS} $<
+ 
+ ${OBJ}: config.h config.mk arg.h util.h
+ 
+ config.h:
+-	@echo creating $@ from config.def.h
+-	@cp config.def.h $@
++	cp config.def.h $@
+ 
+ slock: ${OBJ}
+-	@echo CC -o $@
+-	@${CC} -o $@ ${OBJ} ${LDFLAGS}
++	${CC} -o $@ ${OBJ} ${LDFLAGS}
+ 
+ clean:
+-	@echo cleaning
+-	@rm -f slock ${OBJ} slock-${VERSION}.tar.gz
++	rm -f slock ${OBJ} slock-${VERSION}.tar.gz
+ 
+ dist: clean
+-	@echo creating dist tarball
+-	@mkdir -p slock-${VERSION}
+-	@cp -R LICENSE Makefile README slock.1 config.mk \
+-		${SRC} explicit_bzero.c config.def.h arg.h util.h slock-${VERSION}
+-	@tar -cf slock-${VERSION}.tar slock-${VERSION}
+-	@gzip slock-${VERSION}.tar
+-	@rm -rf slock-${VERSION}
++	mkdir -p slock-${VERSION}
++	cp -R LICENSE Makefile README slock.1 config.mk \
++		${SRC} config.def.h arg.h util.h slock-${VERSION}
++	tar -cf slock-${VERSION}.tar slock-${VERSION}
++	gzip slock-${VERSION}.tar
++	rm -rf slock-${VERSION}
+ 
+ install: all
+-	@echo installing executable file to ${DESTDIR}${PREFIX}/bin
+-	@mkdir -p ${DESTDIR}${PREFIX}/bin
+-	@cp -f slock ${DESTDIR}${PREFIX}/bin
+-	@chmod 755 ${DESTDIR}${PREFIX}/bin/slock
+-	@chmod u+s ${DESTDIR}${PREFIX}/bin/slock
+-	@echo installing manual page to ${DESTDIR}${MANPREFIX}/man1
+-	@mkdir -p ${DESTDIR}${MANPREFIX}/man1
+-	@sed "s/VERSION/${VERSION}/g" <slock.1 >${DESTDIR}${MANPREFIX}/man1/slock.1
+-	@chmod 644 ${DESTDIR}${MANPREFIX}/man1/slock.1
++	mkdir -p ${DESTDIR}${PREFIX}/bin
++	cp -f slock ${DESTDIR}${PREFIX}/bin
++	chmod 755 ${DESTDIR}${PREFIX}/bin/slock
++	chmod u+s ${DESTDIR}${PREFIX}/bin/slock
++	mkdir -p ${DESTDIR}${MANPREFIX}/man1
++	sed "s/VERSION/${VERSION}/g" <slock.1 >${DESTDIR}${MANPREFIX}/man1/slock.1
++	chmod 644 ${DESTDIR}${MANPREFIX}/man1/slock.1
+ 
+ uninstall:
+-	@echo removing executable file from ${DESTDIR}${PREFIX}/bin
+-	@rm -f ${DESTDIR}${PREFIX}/bin/slock
+-	@echo removing manual page from ${DESTDIR}${MANPREFIX}/man1
+-	@rm -f ${DESTDIR}${MANPREFIX}/man1/slock.1
++	rm -f ${DESTDIR}${PREFIX}/bin/slock
++	rm -f ${DESTDIR}${MANPREFIX}/man1/slock.1
+ 
+-.PHONY: all options clean dist install uninstall
++.PHONY: all clean dist install uninstall
 diff --git c/README w/README
 index a81290d..b37c88b 100644
 --- c/README
@@ -70,6 +164,24 @@ index 9855e21..e8c8b98 100644
 +
 +/* time in seconds before the monitor shuts down */
 +static const int monitortime = 3;
+diff --git c/config.mk w/config.mk
+index 74429ae..514c236 100644
+--- c/config.mk
++++ w/config.mk
+@@ -1,5 +1,5 @@
+ # slock version
+-VERSION = 1.4
++VERSION = 1.5
+ 
+ # Customize below to fit your system
+ 
+@@ -27,6 +27,3 @@ COMPATSRC = explicit_bzero.c
+ #CPPFLAGS = -DVERSION=\"${VERSION}\" -D_BSD_SOURCE -D_NETBSD_SOURCE
+ # On OpenBSD set COMPATSRC to empty
+ #COMPATSRC =
+-
+-# compiler and linker
+-CC = cc
 diff --git c/renovate.json w/renovate.json
 new file mode 100644
 index 0000000..f45d8f1
@@ -81,8 +193,66 @@ index 0000000..f45d8f1
 +    "config:base"
 +  ]
 +}
+diff --git c/slock.1 w/slock.1
+index 82cdcd6..40c15e1 100644
+--- c/slock.1
++++ w/slock.1
+@@ -1,5 +1,6 @@
+-.Dd 2016-08-23
++.Dd October 6, 2023
+ .Dt SLOCK 1
++.Os
+ .Sh NAME
+ .Nm slock
+ .Nd simple X screen locker
+@@ -9,31 +10,36 @@
+ .Op Ar cmd Op Ar arg ...
+ .Sh DESCRIPTION
+ .Nm
+-is a simple X screen locker. If provided,
+-.Ar cmd Op Ar arg ...
++is a simple X screen locker.
++If provided,
++.Ar cmd
+ is executed after the screen has been locked.
+-.Sh OPTIONS
++.Pp
++The options are as follows:
+ .Bl -tag -width Ds
+ .It Fl v
+ Print version information to stdout and exit.
+ .El
++.Sh EXIT STATUS
++.Ex -std
++.Sh EXAMPLES
++$
++.Nm
++/usr/sbin/s2ram
+ .Sh SECURITY CONSIDERATIONS
+ To make sure a locked screen can not be bypassed by switching VTs
+ or killing the X server with Ctrl+Alt+Backspace, it is recommended
+ to disable both in
+ .Xr xorg.conf 5
+ for maximum security:
+-.Bd -literal -offset left
++.Bd -literal
+ Section "ServerFlags"
+ 	Option "DontVTSwitch" "True"
+ 	Option "DontZap"      "True"
+ EndSection
+ .Ed
+-.Sh EXAMPLES
+-$
+-.Nm
+-/usr/sbin/s2ram
+ .Sh CUSTOMIZATION
+ .Nm
+ can be customized by creating a custom config.h from config.def.h and
+-(re)compiling the source code. This keeps it fast, secure and simple.
++(re)compiling the source code.
++This keeps it fast, secure and simple.
 diff --git c/slock.c w/slock.c
-index d2f0886..afdc4fc 100644
+index d2f0886..b20747a 100644
 --- c/slock.c
 +++ w/slock.c
 @@ -15,6 +15,7 @@
@@ -143,7 +313,7 @@ index d2f0886..afdc4fc 100644
  static void
  usage(void)
  {
-@@ -306,6 +323,7 @@ main(int argc, char **argv) {
+@@ -306,10 +323,11 @@ main(int argc, char **argv) {
  	const char *hash;
  	Display *dpy;
  	int s, nlocks, nscreens;
@@ -151,6 +321,11 @@ index d2f0886..afdc4fc 100644
  
  	ARGBEGIN {
  	case 'v':
+-		fprintf(stderr, "slock-"VERSION"\n");
++		puts("slock-"VERSION);
+ 		return 0;
+ 	default:
+ 		usage();
 @@ -366,12 +384,28 @@ main(int argc, char **argv) {
  	if (nlocks != nscreens)
  		return 1;
