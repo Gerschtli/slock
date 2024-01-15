@@ -7,5 +7,5 @@ $ sudo make config.h clean install
 # Build patch
 
 ```sh
-$ ./create-patch.sh 1.4
+$ ./create-patch.sh 1.5
 ```

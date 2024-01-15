@@ -1,0 +1,323 @@
+diff --git c/.editorconfig w/.editorconfig
+new file mode 100644
+index 0000000..3bb3187
+--- /dev/null
++++ w/.editorconfig
+@@ -0,0 +1,11 @@
++root = true
++
++[*]
++end_of_line = lf
++charset = utf-8
++trim_trailing_whitespace = true
++insert_final_newline = true
++
++[*.yml]
++indent_style = space
++indent_size = 2
+diff --git c/LICENSE w/LICENSE
+index 2e4419b..cb52dba 100644
+--- c/LICENSE
++++ w/LICENSE
+@@ -4,6 +4,7 @@ MIT/X Consortium License
+ © 2014 Dimitris Papastamos <sin@2f30.org>
+ © 2006-2014 Anselm R Garbe <anselm@garbe.us>
+ © 2014-2016 Laslo Hunhold <dev@frign.de>
++© 2016-2023 Hiltjo Posthuma <hiltjo@codemadness.org>
+ 
+ Permission is hereby granted, free of charge, to any person obtaining a
+ copy of this software and associated documentation files (the "Software"),
+diff --git c/Makefile w/Makefile
+index b20fd4e..6d74b21 100644
+--- c/Makefile
++++ w/Makefile
+@@ -6,56 +6,41 @@ include config.mk
+ SRC = slock.c ${COMPATSRC}
+ OBJ = ${SRC:.c=.o}
+ 
+-all: options slock
+-
+-options:
+-	@echo slock build options:
+-	@echo "CFLAGS   = ${CFLAGS}"
+-	@echo "LDFLAGS  = ${LDFLAGS}"
+-	@echo "CC       = ${CC}"
++all: slock
+ 
+ .c.o:
+-	@echo CC $<
+-	@${CC} -c ${CFLAGS} $<
++	${CC} -c ${CFLAGS} $<
+ 
+ ${OBJ}: config.h config.mk arg.h util.h
+ 
+ config.h:
+-	@echo creating $@ from config.def.h
+-	@cp config.def.h $@
++	cp config.def.h $@
+ 
+ slock: ${OBJ}
+-	@echo CC -o $@
+-	@${CC} -o $@ ${OBJ} ${LDFLAGS}
++	${CC} -o $@ ${OBJ} ${LDFLAGS}
+ 
+ clean:
+-	@echo cleaning
+-	@rm -f slock ${OBJ} slock-${VERSION}.tar.gz
++	rm -f slock ${OBJ} slock-${VERSION}.tar.gz
+ 
+ dist: clean
+-	@echo creating dist tarball
+-	@mkdir -p slock-${VERSION}
+-	@cp -R LICENSE Makefile README slock.1 config.mk \
++	mkdir -p slock-${VERSION}
++	cp -R LICENSE Makefile README slock.1 config.mk \
+ 		${SRC} config.def.h arg.h util.h slock-${VERSION}
+-	@tar -cf slock-${VERSION}.tar slock-${VERSION}
+-	@gzip slock-${VERSION}.tar
+-	@rm -rf slock-${VERSION}
++	tar -cf slock-${VERSION}.tar slock-${VERSION}
++	gzip slock-${VERSION}.tar
++	rm -rf slock-${VERSION}
+ 
+ install: all
+-	@echo installing executable file to ${DESTDIR}${PREFIX}/bin
+-	@mkdir -p ${DESTDIR}${PREFIX}/bin
+-	@cp -f slock ${DESTDIR}${PREFIX}/bin
+-	@chmod 755 ${DESTDIR}${PREFIX}/bin/slock
+-	@chmod u+s ${DESTDIR}${PREFIX}/bin/slock
+-	@echo installing manual page to ${DESTDIR}${MANPREFIX}/man1
+-	@mkdir -p ${DESTDIR}${MANPREFIX}/man1
+-	@sed "s/VERSION/${VERSION}/g" <slock.1 >${DESTDIR}${MANPREFIX}/man1/slock.1
+-	@chmod 644 ${DESTDIR}${MANPREFIX}/man1/slock.1
++	mkdir -p ${DESTDIR}${PREFIX}/bin
++	cp -f slock ${DESTDIR}${PREFIX}/bin
++	chmod 755 ${DESTDIR}${PREFIX}/bin/slock
++	chmod u+s ${DESTDIR}${PREFIX}/bin/slock
++	mkdir -p ${DESTDIR}${MANPREFIX}/man1
++	sed "s/VERSION/${VERSION}/g" <slock.1 >${DESTDIR}${MANPREFIX}/man1/slock.1
++	chmod 644 ${DESTDIR}${MANPREFIX}/man1/slock.1
+ 
+ uninstall:
+-	@echo removing executable file from ${DESTDIR}${PREFIX}/bin
+-	@rm -f ${DESTDIR}${PREFIX}/bin/slock
+-	@echo removing manual page from ${DESTDIR}${MANPREFIX}/man1
+-	@rm -f ${DESTDIR}${MANPREFIX}/man1/slock.1
++	rm -f ${DESTDIR}${PREFIX}/bin/slock
++	rm -f ${DESTDIR}${MANPREFIX}/man1/slock.1
+ 
+-.PHONY: all options clean dist install uninstall
++.PHONY: all clean dist install uninstall
+diff --git c/README w/README
+index dcacd01..b37c88b 100644
+--- c/README
++++ w/README
+@@ -3,6 +3,11 @@ slock - simple screen locker
+ simple screen locker utility for X.
+ 
+ 
++Customizations
++--------------
++Applied slock-dpms patch written by geistesk (https://github.com/geistesk/slock-dpms).
++
++
+ Requirements
+ ------------
+ In order to build slock you need the Xlib header files.
+diff --git c/README.local w/README.local
+new file mode 100644
+index 0000000..74bfe17
+--- /dev/null
++++ w/README.local
+@@ -0,0 +1,11 @@
++# Build from source
++
++```sh
++$ sudo make config.h clean install
++```
++
++# Build patch
++
++```sh
++$ ./create-patch.sh 1.5
++```
+diff --git c/config.def.h w/config.def.h
+index 9855e21..e8c8b98 100644
+--- c/config.def.h
++++ w/config.def.h
+@@ -3,10 +3,13 @@ static const char *user  = "nobody";
+ static const char *group = "nogroup";
+ 
+ static const char *colorname[NUMCOLS] = {
+-	[INIT] =   "black",     /* after initialization */
+-	[INPUT] =  "#005577",   /* during input */
+-	[FAILED] = "#CC3333",   /* wrong password */
++	[INIT] =   "#3077a0",   /* after initialization */
++	[INPUT] =  "#2c7f1f",   /* during input */
++	[FAILED] = "#330606",   /* wrong password */
+ };
+ 
+ /* treat a cleared input like a wrong password (color) */
+-static const int failonclear = 1;
++static const int failonclear = 0;
++
++/* time in seconds before the monitor shuts down */
++static const int monitortime = 3;
+diff --git c/config.mk w/config.mk
+index 1e1ca45..514c236 100644
+--- c/config.mk
++++ w/config.mk
+@@ -27,6 +27,3 @@ COMPATSRC = explicit_bzero.c
+ #CPPFLAGS = -DVERSION=\"${VERSION}\" -D_BSD_SOURCE -D_NETBSD_SOURCE
+ # On OpenBSD set COMPATSRC to empty
+ #COMPATSRC =
+-
+-# compiler and linker
+-CC = cc
+diff --git c/renovate.json w/renovate.json
+new file mode 100644
+index 0000000..f45d8f1
+--- /dev/null
++++ w/renovate.json
+@@ -0,0 +1,5 @@
++{
++  "extends": [
++    "config:base"
++  ]
++}
+diff --git c/slock.1 w/slock.1
+index 82cdcd6..40c15e1 100644
+--- c/slock.1
++++ w/slock.1
+@@ -1,5 +1,6 @@
+-.Dd 2016-08-23
++.Dd October 6, 2023
+ .Dt SLOCK 1
++.Os
+ .Sh NAME
+ .Nm slock
+ .Nd simple X screen locker
+@@ -9,31 +10,36 @@
+ .Op Ar cmd Op Ar arg ...
+ .Sh DESCRIPTION
+ .Nm
+-is a simple X screen locker. If provided,
+-.Ar cmd Op Ar arg ...
++is a simple X screen locker.
++If provided,
++.Ar cmd
+ is executed after the screen has been locked.
+-.Sh OPTIONS
++.Pp
++The options are as follows:
+ .Bl -tag -width Ds
+ .It Fl v
+ Print version information to stdout and exit.
+ .El
++.Sh EXIT STATUS
++.Ex -std
++.Sh EXAMPLES
++$
++.Nm
++/usr/sbin/s2ram
+ .Sh SECURITY CONSIDERATIONS
+ To make sure a locked screen can not be bypassed by switching VTs
+ or killing the X server with Ctrl+Alt+Backspace, it is recommended
+ to disable both in
+ .Xr xorg.conf 5
+ for maximum security:
+-.Bd -literal -offset left
++.Bd -literal
+ Section "ServerFlags"
+ 	Option "DontVTSwitch" "True"
+ 	Option "DontZap"      "True"
+ EndSection
+ .Ed
+-.Sh EXAMPLES
+-$
+-.Nm
+-/usr/sbin/s2ram
+ .Sh CUSTOMIZATION
+ .Nm
+ can be customized by creating a custom config.h from config.def.h and
+-(re)compiling the source code. This keeps it fast, secure and simple.
++(re)compiling the source code.
++This keeps it fast, secure and simple.
+diff --git c/slock.c w/slock.c
+index 5ae738c..b20747a 100644
+--- c/slock.c
++++ w/slock.c
+@@ -15,6 +15,7 @@
+ #include <unistd.h>
+ #include <sys/types.h>
+ #include <X11/extensions/Xrandr.h>
++#include <X11/extensions/dpms.h>
+ #include <X11/keysym.h>
+ #include <X11/Xlib.h>
+ #include <X11/Xutil.h>
+@@ -297,6 +298,14 @@ lockscreen(Display *dpy, struct xrandr *rr, int screen)
+ 	return NULL;
+ }
+ 
++static void
++monitorreset(Display* dpy, CARD16 standby, CARD16 suspend, CARD16 off)
++{
++	DPMSSetTimeouts(dpy, standby, suspend, off);
++	DPMSForceLevel(dpy, DPMSModeOn);
++	XFlush(dpy);
++}
++
+ static void
+ usage(void)
+ {
+@@ -314,10 +323,11 @@ main(int argc, char **argv) {
+ 	const char *hash;
+ 	Display *dpy;
+ 	int s, nlocks, nscreens;
++	CARD16 standby, suspend, off;
+ 
+ 	ARGBEGIN {
+ 	case 'v':
+-		fprintf(stderr, "slock-"VERSION"\n");
++		puts("slock-"VERSION);
+ 		return 0;
+ 	default:
+ 		usage();
+@@ -374,12 +384,28 @@ main(int argc, char **argv) {
+ 	if (nlocks != nscreens)
+ 		return 1;
+ 
++	/* DPMS-magic to disable the monitor */
++	if (!DPMSCapable(dpy))
++		die("slock: DPMSCapable failed\n");
++	if (!DPMSEnable(dpy))
++		die("slock: DPMSEnable failed\n");
++	if (!DPMSGetTimeouts(dpy, &standby, &suspend, &off))
++		die("slock: DPMSGetTimeouts failed\n");
++	if (!standby || !suspend || !off)
++		/* set values if there arent some */
++		standby = suspend = off = 300;
++
++	DPMSSetTimeouts(dpy, monitortime, monitortime, monitortime);
++	XFlush(dpy);
++
+ 	/* run post-lock command */
+ 	if (argc > 0) {
+ 		switch (fork()) {
+ 		case -1:
+ 			die("slock: fork failed: %s\n", strerror(errno));
+ 		case 0:
++			monitorreset(dpy, standby, suspend, off);
++
+ 			if (close(ConnectionNumber(dpy)) < 0)
+ 				die("slock: close: %s\n", strerror(errno));
+ 			execvp(argv[0], argv);
+@@ -391,5 +417,8 @@ main(int argc, char **argv) {
+ 	/* everything is now blank. Wait for the correct password */
+ 	readpw(dpy, &rr, locks, nscreens, hash);
+ 
++	/* reset DPMS values to inital ones */
++	monitorreset(dpy, standby, suspend, off);
++
+ 	return 0;
+ }
