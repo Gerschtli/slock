@@ -11,12 +11,16 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Fetch tags
         run: git fetch --depth=1 origin +refs/tags/*:refs/tags/*
 
       - name: Create patch
-        run: ./create-patch.sh ${{env.version}}
+        env:
+          VERSION: ${{ env.version }}
+        run: ./create-patch.sh "$VERSION"
 
       - name: Check patch
         run: git diff --exit-code
