@@ -176,13 +176,13 @@ index 1e1ca45..514c236 100644
 -CC = cc
 diff --git c/renovate.json w/renovate.json
 new file mode 100644
-index 0000000..f45d8f1
+index 0000000..b42c4fb
 --- /dev/null
 +++ w/renovate.json
 @@ -0,0 +1,5 @@
 +{
 +  "extends": [
-+    "config:base"
++    "config:recommended"
 +  ]
 +}
 diff --git c/slock.1 w/slock.1
