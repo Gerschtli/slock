@@ -1,0 +1,161 @@
+diff --git c/.editorconfig w/.editorconfig
+new file mode 100644
+index 0000000..3bb3187
+--- /dev/null
++++ w/.editorconfig
+@@ -0,0 +1,11 @@
++root = true
++
++[*]
++end_of_line = lf
++charset = utf-8
++trim_trailing_whitespace = true
++insert_final_newline = true
++
++[*.yml]
++indent_style = space
++indent_size = 2
+diff --git c/README w/README
+index dcacd01..b37c88b 100644
+--- c/README
++++ w/README
+@@ -3,6 +3,11 @@ slock - simple screen locker
+ simple screen locker utility for X.
+ 
+ 
++Customizations
++--------------
++Applied slock-dpms patch written by geistesk (https://github.com/geistesk/slock-dpms).
++
++
+ Requirements
+ ------------
+ In order to build slock you need the Xlib header files.
+diff --git c/README.local w/README.local
+new file mode 100644
+index 0000000..5d72932
+--- /dev/null
++++ w/README.local
+@@ -0,0 +1,11 @@
++# Build from source
++
++```sh
++$ sudo make config.h clean install
++```
++
++# Build patch
++
++```sh
++$ ./create-patch.sh 1.6
++```
+diff --git c/config.def.h w/config.def.h
+index 9855e21..e8c8b98 100644
+--- c/config.def.h
++++ w/config.def.h
+@@ -3,10 +3,13 @@ static const char *user  = "nobody";
+ static const char *group = "nogroup";
+ 
+ static const char *colorname[NUMCOLS] = {
+-	[INIT] =   "black",     /* after initialization */
+-	[INPUT] =  "#005577",   /* during input */
+-	[FAILED] = "#CC3333",   /* wrong password */
++	[INIT] =   "#3077a0",   /* after initialization */
++	[INPUT] =  "#2c7f1f",   /* during input */
++	[FAILED] = "#330606",   /* wrong password */
+ };
+ 
+ /* treat a cleared input like a wrong password (color) */
+-static const int failonclear = 1;
++static const int failonclear = 0;
++
++/* time in seconds before the monitor shuts down */
++static const int monitortime = 3;
+diff --git c/renovate.json w/renovate.json
+new file mode 100644
+index 0000000..b42c4fb
+--- /dev/null
++++ w/renovate.json
+@@ -0,0 +1,5 @@
++{
++  "extends": [
++    "config:recommended"
++  ]
++}
+diff --git c/slock.c w/slock.c
+index b5a9b04..18ad2c0 100644
+--- c/slock.c
++++ w/slock.c
+@@ -16,6 +16,7 @@
+ #include <spawn.h>
+ #include <sys/types.h>
+ #include <X11/extensions/Xrandr.h>
++#include <X11/extensions/dpms.h>
+ #include <X11/keysym.h>
+ #include <X11/Xlib.h>
+ #include <X11/Xutil.h>
+@@ -185,6 +186,9 @@ readpw(Display *dpy, struct xrandr *rr, struct lock **locks, int nscreens,
+ 				    (len + num < sizeof(passwd))) {
+ 					memcpy(passwd + len, buf, num);
+ 					len += num;
++				} else if (buf[0] == '\025') { /* ctrl-u clears input */
++					explicit_bzero(&passwd, sizeof(passwd));
++					len = 0;
+ 				}
+ 				break;
+ 			}
+@@ -298,6 +302,14 @@ lockscreen(Display *dpy, struct xrandr *rr, int screen)
+ 	return NULL;
+ }
+ 
++static void
++monitorreset(Display* dpy, CARD16 standby, CARD16 suspend, CARD16 off)
++{
++	DPMSSetTimeouts(dpy, standby, suspend, off);
++	DPMSForceLevel(dpy, DPMSModeOn);
++	XFlush(dpy);
++}
++
+ static void
+ usage(void)
+ {
+@@ -315,6 +327,7 @@ main(int argc, char **argv) {
+ 	const char *hash;
+ 	Display *dpy;
+ 	int s, nlocks, nscreens;
++	CARD16 standby, suspend, off;
+ 
+ 	ARGBEGIN {
+ 	case 'v':
+@@ -375,8 +388,23 @@ main(int argc, char **argv) {
+ 	if (nlocks != nscreens)
+ 		return 1;
+ 
++	/* DPMS-magic to disable the monitor */
++	if (!DPMSCapable(dpy))
++		die("slock: DPMSCapable failed\n");
++	if (!DPMSEnable(dpy))
++		die("slock: DPMSEnable failed\n");
++	if (!DPMSGetTimeouts(dpy, &standby, &suspend, &off))
++		die("slock: DPMSGetTimeouts failed\n");
++	if (!standby || !suspend || !off)
++		/* set values if there arent some */
++		standby = suspend = off = 300;
++
++	DPMSSetTimeouts(dpy, monitortime, monitortime, monitortime);
++	XFlush(dpy);
++
+ 	/* run post-lock command */
+ 	if (argc > 0) {
++        monitorreset(dpy, standby, suspend, off);
+ 		pid_t pid;
+ 		extern char **environ;
+ 		int err = posix_spawnp(&pid, argv[0], NULL, NULL, argv, environ);
+@@ -389,5 +417,8 @@ main(int argc, char **argv) {
+ 	/* everything is now blank. Wait for the correct password */
+ 	readpw(dpy, &rr, locks, nscreens, hash);
+ 
++	/* reset DPMS values to inital ones */
++	monitorreset(dpy, standby, suspend, off);
++
+ 	return 0;
+ }
